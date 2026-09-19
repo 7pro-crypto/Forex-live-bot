@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forex Live Signal</title>
+<style>
+body{margin:0;background:#0b0d12;color:#fff;font-family:Arial;text-align:center;padding:20px}
+.card{max-width:600px;margin:auto;background:#151922;border-radius:20px;padding:20px}
+select,button{width:100%;padding:14px;margin:6px 0;border-radius:10px;font-size:16px}
+select{background:#0e1118;color:#fff;border:1px solid #333}
+button{background:#fff;color:#111;border:0;font-weight:bold}
+#price{font-size:32px;margin:20px}
+#signal{font-size:42px;font-weight:bold;margin:25px}
+#status{color:#9da5b5}
+canvas{width:100%;height:220px;background:#0e1118;border-radius:10px;margin-top:15px}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🌐 Forex Live Signal</h1>
+
+<select id="pair">
+<option>EUR/JPY</option>
+<option>EUR/USD</option>
+<option>GBP/USD</option>
+<option>GBP/JPY</option>
+<option>USD/JPY</option>
+<option>USD/CHF</option>
+<option>AUD/USD</option>
+<option>NZD/USD</option>
+<option>USD/CAD</option>
+<option>EUR/GBP</option>
+<option>EUR/CHF</option>
+<option>AUD/JPY</option>
+<option>CAD/JPY</option>
+<option>CHF/JPY</option>
+<option>NZD/JPY</option>
+<option>EUR/AUD</option>
+<option>GBP/CHF</option>
+<option>GBP/AUD</option>
+<option>AUD/CAD</option>
+<option>AUD/CHF</option>
+</select>
+
+<select id="tf">
+<option value="1min">1 Minute</option>
+<option value="5min">5 Minutes</option>
+<option value="15min">15 Minutes</option>
+<option value="30min">30 Minutes</option>
+<option value="1h">1 Hour</option>
+<option value="4h">4 Hours</option>
+<option value="1day">1 Day</option>
+</select>
+
+<div id="price">--</div>
+<div id="status">Connecting...</div>
+<div id="signal">WAIT</div>
+
+<canvas id="chart" width="680" height="220"></canvas>
+
+<button onclick="loadData()">REFRESH</button>
+</div>
+
+<script>
+const pair=document.getElementById("pair");
+const tf=document.getElementById("tf");
+const price=document.getElementById("price");
+const signal=document.getElementById("signal");
+const status=document.getElementById("status");
+const canvas=document.getElementById("chart");
+const ctx=canvas.getContext("2d");
+
+async function loadData(){
+ try{
+  status.textContent="Loading "+pair.value+"...";
+
+  const r=await fetch(
+   "/api/data?symbol="+encodeURIComponent(pair.value)+
+   "&interval="+tf.value+"&x="+Date.now()
+  );
+
+  const d=await r.json();
+
+  if(!d.values) throw new Error(d.message||"No market data");
+
+  const a=d.values
+   .map(x=>Number(x.close))
+   .filter(Number.isFinite);
+
+  if(a.length<5) throw new Error("Not enough data");
+
+  const last=a[0];
+  const previous=a[1];
+
+  const short=a.slice(0,5)
+   .reduce((x,y)=>x+y,0)/5;
+
+  const long=a.slice(0,20)
+   .reduce((x,y)=>x+y,0)/Math.min(20,a.length);
+
+  price.textContent=last.toFixed(5);
+
+  if(last>short && short>long && last>previous){
+   signal.textContent="LIVE BUY";
+  }else if(last<short && short<long && last<previous){
+   signal.textContent="LIVE SELL";
+  }else{
+   signal.textContent="WAIT";
+  }
+
+  status.textContent=
+   "LIVE • "+pair.value+" • "+tf.options[tf.selectedIndex].text;
+
+  draw(a);
+
+ }catch(e){
+  status.textContent="Data error";
+  signal.textContent="WAIT";
+ }
+}
+
+function draw(a){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ const max=Math.max(...a);
+ const min=Math.min(...a);
+ const range=max-min||1;
+
+ ctx.beginPath();
+
+ a.slice().reverse().forEach((v,i)=>{
+  const x=15+i*(650/Math.max(1,a.length-1));
+  const y=205-((v-min)/range)*185;
+
+  if(i===0) ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+ });
+
+ ctx.strokeStyle="#72a7ff";
+ ctx.lineWidth=3;
+ ctx.stroke();
+}
+
+pair.onchange=loadData;
+tf.onchange=loadData;
+
+loadData();
+setInterval(loadData,60000);
+</script>
+</body>
+</html>
